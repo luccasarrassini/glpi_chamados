@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+
+# Local configuration/secrets
+config_local.json
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+
+# Temporary LibreOffice lock files
+.~lock*.ods#
