@@ -1,4 +1,5 @@
 import math
+import unicodedata
 from html import escape
 
 import pandas as pd
@@ -33,6 +34,33 @@ def int_or_none(value):
         return int(float(value))
     except Exception:
         return None
+
+
+def _normalizar_texto_tipo(value):
+    texto = str(value).strip().lower()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    return texto
+
+
+def tipo_ticket_or_none(value):
+    if is_empty(value):
+        return None
+
+    numero = int_or_none(value)
+    if numero in (1, 2):
+        return numero
+
+    texto = _normalizar_texto_tipo(value)
+    mapa = {
+        "incidente": 1,
+        "incident": 1,
+        "requisicao": 2,
+        "requisicao de servico": 2,
+        "request": 2,
+        "solicitacao": 2,
+    }
+    return mapa.get(texto)
 
 
 def preparar_texto_glpi(value, usar_html=False):
@@ -91,6 +119,7 @@ def validar_dataframe(df):
             localizacao_id = row["localizacao_id"]
             tecnico_id = row.get("tecnico_id")
             requerente_id = row.get("requerente_id")
+            tipo = row.get("tipo")
 
             if is_empty(titulo):
                 linhas_invalidas.append((linha_excel, "titulo vazio"))
@@ -123,6 +152,10 @@ def validar_dataframe(df):
 
             if campo_invalido:
                 linhas_invalidas.append((linha_excel, f"{campo_invalido} invalido"))
+                continue
+
+            if not is_empty(tipo) and tipo_ticket_or_none(tipo) is None:
+                linhas_invalidas.append((linha_excel, "tipo invalido (use incidente/requisicao ou 1/2)"))
                 continue
 
             validas += 1

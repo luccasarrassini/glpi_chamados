@@ -5,7 +5,14 @@ from pathlib import Path
 import pandas as pd
 
 from .glpi_service import GLPIClient
-from .planilha_utils import int_or_none, is_empty, normalizar_colunas, preparar_texto_glpi, validar_dataframe
+from .planilha_utils import (
+    int_or_none,
+    is_empty,
+    normalizar_colunas,
+    preparar_texto_glpi,
+    tipo_ticket_or_none,
+    validar_dataframe,
+)
 
 
 class ChamadosBackend:
@@ -233,6 +240,7 @@ class ChamadosBackend:
                 localizacao_id = int_or_none(row["localizacao_id"])
                 tecnico_id = int_or_none(row.get("tecnico_id"))
                 requerente_id = int_or_none(row.get("requerente_id"))
+                tipo = tipo_ticket_or_none(row.get("tipo"))
 
                 if None in (categoria_id, localizacao_id):
                     ignorados += 1
@@ -242,6 +250,19 @@ class ChamadosBackend:
                             "linha_excel": linha_excel,
                             "status": "ignorado",
                             "motivo": "categoria_id/localizacao_id invalido",
+                        }
+                    )
+                    progresso_cb(index + 1, total)
+                    continue
+
+                if not is_empty(row.get("tipo")) and tipo is None:
+                    ignorados += 1
+                    log_cb(f"[AVISO] Linha {linha_excel}: tipo invalido. Use incidente/requisicao ou 1/2. Ignorada.")
+                    detalhes.append(
+                        {
+                            "linha_excel": linha_excel,
+                            "status": "ignorado",
+                            "motivo": "tipo invalido",
                         }
                     )
                     progresso_cb(index + 1, total)
@@ -277,7 +298,7 @@ class ChamadosBackend:
                     "name": str(titulo).strip(),
                     "content": preparar_texto_glpi(descricao, usar_html=usar_html),
                     "status": 1,
-                    "type": 1,
+                    "type": tipo or 1,
                     "itilcategories_id": categoria_id,
                     "locations_id": localizacao_id,
                 }

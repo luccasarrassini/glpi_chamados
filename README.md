@@ -21,12 +21,15 @@ Colunas obrigatorias:
 Colunas opcionais:
 - `tecnico_id`
 - `requerente_id`
+- `tipo`
 
 Regras:
 - `titulo` nao pode ser vazio.
 - `categoria_id` e `localizacao_id` devem ser numericos.
 - Se `tecnico_id` e/ou `requerente_id` forem enviados, devem ser numericos.
 - Se `tecnico_id` e `requerente_id` estiverem vazios (ou sem coluna), o chamado e criado sem atribuicao.
+- `tipo` aceita `incidente` ou `requisicao` (tambem `1` ou `2`).
+- Se `tipo` estiver vazio, o padrao e `incidente` (`1`).
 
 ### 2) Fechar chamados
 Colunas obrigatorias:
