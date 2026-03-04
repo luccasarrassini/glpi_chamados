@@ -80,28 +80,28 @@ def preparar_texto_glpi(value, usar_html=False):
         limpa = linha.strip()
         if limpa.startswith("- ") or limpa.startswith("* "):
             if not em_lista:
-                partes.append("<ul>")
+                partes.append("<ul>\n")
                 em_lista = True
             item = escape(limpa[2:].strip())
-            partes.append(f"<li>{item}</li>")
+            partes.append(f"<li>{item}</li>\n")
             continue
 
         if em_lista:
-            partes.append("</ul>")
+            partes.append("</ul>\n")
             em_lista = False
 
         if limpa == "":
-            partes.append("<br>")
+            partes.append("<p>&nbsp;</p>\n")
             continue
 
         # Preserva espacos duplos e tabs em HTML.
         linha_html = escape(linha).replace("  ", "&nbsp;&nbsp;").replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;")
-        partes.append(linha_html + "<br>")
+        partes.append(f"<p>{linha_html}</p>\n")
 
     if em_lista:
-        partes.append("</ul>")
+        partes.append("</ul>\n")
 
-    return "".join(partes).rstrip("<br>")
+    return "".join(partes).rstrip()
 
 
 def validar_dataframe(df):
