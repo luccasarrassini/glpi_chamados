@@ -1,4 +1,4 @@
-import tkinter as tk
+﻿import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
@@ -39,7 +39,17 @@ class ImportadorGLPIApp:
             bordercolor="#E5E7EB",
         )
 
-        header = ttk.Frame(self.root, padding=(16, 14))
+        self.canvas = tk.Canvas(self.root, highlightthickness=0)
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.canvas.yview)
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.content = ttk.Frame(self.canvas)
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.content, anchor="nw")
+        self._configurar_scroll()
+
+        header = ttk.Frame(self.content, padding=(16, 14))
         header.pack(fill="x")
         ttk.Label(header, text="Importacao de Chamados para o GLPI", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
@@ -48,7 +58,7 @@ class ImportadorGLPIApp:
             style="SubTitle.TLabel",
         ).pack(anchor="w", pady=(4, 0))
 
-        auth_frame = ttk.LabelFrame(self.root, text="1) Autenticacao", padding=12)
+        auth_frame = ttk.LabelFrame(self.content, text="1) Autenticacao", padding=12)
         auth_frame.pack(fill="x", padx=16, pady=(0, 10))
         self.url_var = tk.StringVar(value="")
         self.user_token_var = tk.StringVar(value="")
@@ -78,7 +88,7 @@ class ImportadorGLPIApp:
         auth_frame.columnconfigure(2, weight=2)
         auth_frame.columnconfigure(3, weight=1)
 
-        arquivo_frame = ttk.LabelFrame(self.root, text="2) Arquivo", padding=12)
+        arquivo_frame = ttk.LabelFrame(self.content, text="2) Arquivo", padding=12)
         arquivo_frame.pack(fill="x", padx=16, pady=(0, 10))
         self.caminho_var = tk.StringVar(value="Nenhum arquivo selecionado.")
         ttk.Entry(arquivo_frame, textvariable=self.caminho_var, state="readonly").pack(
@@ -90,7 +100,7 @@ class ImportadorGLPIApp:
         self.selecionar_btn.pack(side="left")
         self.selecionar_btn.configure(state="disabled")
 
-        resumo_frame = ttk.LabelFrame(self.root, text="3) Validacao", padding=12)
+        resumo_frame = ttk.LabelFrame(self.content, text="3) Validacao", padding=12)
         resumo_frame.pack(fill="x", padx=16, pady=(0, 10))
         self.status_colunas_var = tk.StringVar(value="Colunas: aguardando arquivo.")
         self.status_api_var = tk.StringVar(value="Validacao API: aguardando.")
@@ -113,7 +123,7 @@ class ImportadorGLPIApp:
             row=1, column=0, columnspan=4, sticky="w", pady=(4, 0)
         )
 
-        preview_frame = ttk.LabelFrame(self.root, text="4) Pre-visualizacao (primeiras 100 linhas)", padding=12)
+        preview_frame = ttk.LabelFrame(self.content, text="4) Pre-visualizacao (primeiras 100 linhas)", padding=12)
         preview_frame.pack(fill="both", expand=True, padx=16, pady=(0, 10))
         self.tree = ttk.Treeview(preview_frame, show="headings")
         vsb = ttk.Scrollbar(preview_frame, orient="vertical", command=self.tree.yview)
@@ -125,7 +135,7 @@ class ImportadorGLPIApp:
         preview_frame.columnconfigure(0, weight=1)
         preview_frame.rowconfigure(0, weight=1)
 
-        import_frame = ttk.LabelFrame(self.root, text="5) Importacao", padding=12)
+        import_frame = ttk.LabelFrame(self.content, text="5) Importacao", padding=12)
         import_frame.pack(fill="x", padx=16, pady=(0, 10))
         self.importar_btn = ttk.Button(
             import_frame,
@@ -143,6 +153,14 @@ class ImportadorGLPIApp:
             command=self.fechar_chamados_planilha,
         )
         self.fechar_btn.pack(side="left", padx=(10, 0))
+        self.solucionar_btn = ttk.Button(
+            import_frame,
+            text="Solucionar Chamados (planilha)",
+            style="Primary.TButton",
+            state="disabled",
+            command=self.solucionar_chamados_planilha,
+        )
+        self.solucionar_btn.pack(side="left", padx=(10, 0))
         self.validar_api_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
             import_frame,
@@ -164,7 +182,7 @@ class ImportadorGLPIApp:
         self.status_importacao_var = tk.StringVar(value="Aguardando arquivo valido para liberar a importacao.")
         ttk.Label(import_frame, textvariable=self.status_importacao_var, style="Info.TLabel").pack(side="left", padx=(12, 0))
 
-        progresso_frame = ttk.Frame(self.root, padding=(16, 0, 16, 0))
+        progresso_frame = ttk.Frame(self.content, padding=(16, 0, 16, 0))
         progresso_frame.pack(fill="x")
         self.progresso = ttk.Progressbar(progresso_frame, mode="determinate", style="Green.Horizontal.TProgressbar")
         self.progresso.pack(fill="x")
@@ -173,7 +191,7 @@ class ImportadorGLPIApp:
         ttk.Label(progresso_frame, textvariable=self.progresso_var, style="Info.TLabel").pack(anchor="w", pady=(4, 0))
         ttk.Label(progresso_frame, textvariable=self.contador_var, style="Info.TLabel").pack(anchor="w")
 
-        log_frame = ttk.LabelFrame(self.root, text="6) Log", padding=12)
+        log_frame = ttk.LabelFrame(self.content, text="6) Log", padding=12)
         log_frame.pack(fill="both", expand=False, padx=16, pady=(10, 14))
         self.log = ScrolledText(log_frame, height=10, font=("Consolas", 10))
         self.log.pack(fill="both", expand=True)
@@ -192,10 +210,26 @@ class ImportadorGLPIApp:
         self.log.configure(state="disabled")
         self.root.update_idletasks()
 
+    def _configurar_scroll(self):
+        self.content.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfigure(self.canvas_window, width=e.width))
+        self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-4>", self._on_mousewheel)
+        self.canvas.bind_all("<Button-5>", self._on_mousewheel)
+
+    def _on_mousewheel(self, event):
+        if event.num == 4:
+            self.canvas.yview_scroll(-1, "units")
+        elif event.num == 5:
+            self.canvas.yview_scroll(1, "units")
+        elif getattr(event, "delta", 0):
+            self.canvas.yview_scroll(int(-event.delta / 120), "units")
+
     def _set_botoes_operacao(self, habilitado):
         estado = "normal" if habilitado else "disabled"
         self.importar_btn.configure(state=estado)
         self.fechar_btn.configure(state=estado)
+        self.solucionar_btn.configure(state=estado)
 
     def _reset_progresso(self, total):
         self.progresso.configure(maximum=total, value=0)
@@ -305,6 +339,7 @@ class ImportadorGLPIApp:
             self.buscar_nomes_btn.configure(state="disabled")
             self.importar_btn.configure(state="disabled")
             self.fechar_btn.configure(state="disabled")
+            self.solucionar_btn.configure(state="disabled")
             self.status_importacao_var.set("Importacao bloqueada: autentique-se primeiro.")
             self.log_msg(f"[ERRO] Falha de autenticacao: {e}")
             messagebox.showerror("Autenticacao", f"Nao foi possivel autenticar no GLPI.\n{e}")
@@ -313,6 +348,7 @@ class ImportadorGLPIApp:
         self.status_auth_var.set("Autenticado com sucesso.")
         self.selecionar_btn.configure(state="normal")
         self.fechar_btn.configure(state="normal")
+        self.solucionar_btn.configure(state="normal")
         if self.backend.df is not None:
             self.buscar_nomes_btn.configure(state="normal")
         self._salvar_config_local()
@@ -433,6 +469,66 @@ class ImportadorGLPIApp:
         messagebox.showinfo("Fechamento finalizado", resultado["resumo"])
         self._set_botoes_operacao(habilitado=True)
 
+    def solucionar_chamados_planilha(self):
+        if not self.backend.autenticado or self.backend.cliente is None:
+            messagebox.showwarning("Autenticacao", "Autentique-se antes de solucionar chamados.")
+            return
+        caminho = filedialog.askopenfilename(title="Selecione a planilha de solucao", filetypes=PLANILHA_FILETYPES)
+        if not caminho:
+            return
+
+        try:
+            df = self.backend.preparar_planilha_solucao(caminho)
+        except ValueError as e:
+            messagebox.showerror("Planilha invalida", str(e))
+            self.log_msg(f"[ERRO] {e}")
+            return
+        except Exception as e:
+            self.log_msg(f"[ERRO] Falha ao ler planilha de solucao: {e}")
+            messagebox.showerror("Erro", f"Nao foi possivel ler a planilha.\n{e}")
+            return
+
+        if len(df) == 0:
+            messagebox.showwarning("Planilha vazia", "A planilha de solucao nao possui linhas.")
+            return
+
+        self._preencher_tree_com_dataframe(df.head(100))
+        self.status_importacao_var.set("Pre-visualizacao de solucao carregada.")
+        self.log_msg("[INFO] Pre-visualizacao da planilha de solucao exibida (primeiras 100 linhas).")
+
+        confirmar = messagebox.askyesno(
+            "Confirmar solucoes",
+            f"Deseja processar inclusao de solucao em {len(df)} linha(s)?\nA pre-visualizacao foi atualizada.",
+        )
+        if not confirmar:
+            return
+
+        self._set_botoes_operacao(habilitado=False)
+        self.status_importacao_var.set("Inclusao de solucoes em andamento...")
+        self.log_msg(f"[INFO] Iniciando inclusao de solucoes em lote ({len(df)} linha(s))...")
+        if self.usar_html_var.get():
+            self.log_msg("[INFO] Solucao sera enviada em HTML basico para preservar formatacao.")
+        self._reset_progresso(len(df))
+
+        try:
+            resultado = self.backend.solucionar_chamados(
+                df=df,
+                usar_html=self.usar_html_var.get(),
+                log_cb=self.log_msg,
+                progresso_cb=self._atualizar_progresso,
+            )
+        except Exception as e:
+            self.log_msg(f"[ERRO] Nao foi possivel concluir inclusao de solucoes: {e}")
+            messagebox.showerror("Erro", f"Nao foi possivel concluir inclusao de solucoes.\n{e}")
+            self.status_importacao_var.set("Falha ao incluir solucoes.")
+            self._set_botoes_operacao(habilitado=True)
+            return
+
+        self.status_importacao_var.set(resultado["resumo"])
+        self.log_msg("[INFO] " + resultado["resumo"])
+        messagebox.showinfo("Solucoes finalizadas", resultado["resumo"])
+        self._set_botoes_operacao(habilitado=True)
+
     def buscar_nomes_api(self):
         if not self.backend.autenticado or self.backend.cliente is None:
             messagebox.showwarning("Autenticacao", "Autentique-se antes de consultar nomes na API.")
@@ -498,3 +594,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

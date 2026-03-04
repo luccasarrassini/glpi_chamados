@@ -1,5 +1,6 @@
 requests
 pandas
 openpyxl
+xlrd
 odfpy
 pyinstaller

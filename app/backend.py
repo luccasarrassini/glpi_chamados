@@ -38,8 +38,15 @@ class ChamadosBackend:
 
     @staticmethod
     def ler_planilha(caminho):
-        if caminho.lower().endswith(".ods"):
+        caminho_lower = caminho.lower()
+
+        if caminho_lower.endswith(".ods"):
             return pd.read_excel(caminho, engine="odf")
+        if caminho_lower.endswith(".xls"):
+            return pd.read_excel(caminho, engine="xlrd")
+        if caminho_lower.endswith((".xlsx", ".xlsm")):
+            return pd.read_excel(caminho, engine="openpyxl")
+
         return pd.read_excel(caminho)
 
     def carregar_planilha_importacao(self, caminho):
@@ -287,6 +294,14 @@ class ChamadosBackend:
             raise ValueError("A planilha deve conter a coluna obrigatoria: ticket_id")
         return df
 
+    def preparar_planilha_solucao(self, caminho):
+        df = normalizar_colunas(self.ler_planilha(caminho))
+        colunas_obrigatorias = {"ticket_id", "solucao"}
+        faltantes = [col for col in colunas_obrigatorias if col not in df.columns]
+        if faltantes:
+            raise ValueError(f"A planilha deve conter as colunas obrigatorias: {', '.join(sorted(faltantes))}")
+        return df
+
     def fechar_chamados(self, df, usar_html, log_cb, progresso_cb):
         total = len(df)
         possui_solucao = "solucao" in df.columns
@@ -337,6 +352,62 @@ class ChamadosBackend:
                 "erros": erros,
                 "ignorados": ignorados,
                 "resumo": f"Fechamento finalizado: {fechados} fechados, {erros} erros, {ignorados} ignorados.",
+            }
+        finally:
+            try:
+                self.cliente.finalizar_sessao(headers)
+                log_cb("[OK] Sessao GLPI finalizada.")
+            except Exception as e:
+                log_cb(f"[AVISO] Nao foi possivel finalizar a sessao: {e}")
+
+    def solucionar_chamados(self, df, usar_html, log_cb, progresso_cb):
+        total = len(df)
+        headers = self.cliente.iniciar_sessao()
+        log_cb("[OK] Sessao GLPI iniciada para inclusao de solucao.")
+
+        solucionados = 0
+        erros = 0
+        ignorados = 0
+
+        try:
+            for index, row in df.iterrows():
+                linha_excel = index + 2
+                ticket_id = int_or_none(row.get("ticket_id"))
+                texto_solucao = row.get("solucao")
+
+                if ticket_id is None:
+                    ignorados += 1
+                    log_cb(f"[AVISO] Linha {linha_excel}: ticket_id invalido. Ignorada.")
+                    progresso_cb(index + 1, total)
+                    continue
+
+                if is_empty(texto_solucao):
+                    ignorados += 1
+                    log_cb(f"[AVISO] Linha {linha_excel} / Ticket {ticket_id}: solucao vazia. Ignorada.")
+                    progresso_cb(index + 1, total)
+                    continue
+
+                try:
+                    conteudo_solucao = preparar_texto_glpi(texto_solucao, usar_html=usar_html)
+                    r_solucao = self.cliente.adicionar_solucao(headers, ticket_id, conteudo_solucao)
+                    if r_solucao.status_code in (200, 201):
+                        solucionados += 1
+                    else:
+                        erros += 1
+                        log_cb(
+                            f"[ERRO] Linha {linha_excel} / Ticket {ticket_id}: status {r_solucao.status_code} - {r_solucao.text[:180]}"
+                        )
+                except Exception as e:
+                    erros += 1
+                    log_cb(f"[ERRO] Linha {linha_excel} / Ticket {ticket_id}: falha de requisicao - {e}")
+
+                progresso_cb(index + 1, total)
+
+            return {
+                "solucionados": solucionados,
+                "erros": erros,
+                "ignorados": ignorados,
+                "resumo": f"Solucoes finalizadas: {solucionados} adicionadas, {erros} erros, {ignorados} ignorados.",
             }
         finally:
             try:
