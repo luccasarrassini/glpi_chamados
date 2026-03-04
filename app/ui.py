@@ -408,8 +408,8 @@ class ImportadorGLPIApp:
         self.log_msg("[INFO] " + resultado["resumo"])
         try:
             log_texto = self.log.get("1.0", tk.END).strip() + "\n"
-            caminho_json, caminho_log = self.backend.salvar_relatorio_importacao(resultado, log_texto)
-            self.log_msg(f"[OK] Relatorio JSON salvo em: {caminho_json}")
+            caminho_xlsx, caminho_log = self.backend.salvar_relatorio_importacao(resultado, log_texto)
+            self.log_msg(f"[OK] Planilha de tickets criados salva em: {caminho_xlsx}")
             self.log_msg(f"[OK] Log salvo em: {caminho_log}")
         except Exception as e:
             self.log_msg(f"[AVISO] Nao foi possivel salvar relatorio/log da importacao: {e}")

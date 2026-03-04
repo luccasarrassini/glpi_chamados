@@ -59,8 +59,8 @@ Principais libs de planilha usadas pelo app:
 
 ## Relatorios gerados
 Ao finalizar a importacao de chamados, o app salva automaticamente:
-- JSON com resumo + detalhes por linha (incluindo `ticket_id` quando criado).
+- Planilha Excel com os `ticket_id` criados.
 - Arquivo de log texto da execucao.
 
 Local padrao:
-- pasta `relatorios` no diretorio do projeto/app.
+- `Documentos\logchamados`.

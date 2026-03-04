@@ -492,28 +492,26 @@ class ChamadosBackend:
                 log_cb(f"[AVISO] Nao foi possivel finalizar a sessao: {e}")
 
     def salvar_relatorio_importacao(self, resultado, log_texto):
-        pasta_relatorios = self.config_path.parent / "relatorios"
-        pasta_relatorios.mkdir(parents=True, exist_ok=True)
+        pasta_relatorios = Path.home() / "Documents" / "logchamados"
+        try:
+            pasta_relatorios.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pasta_relatorios = self.config_path.parent / "logchamados"
+            pasta_relatorios.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_nome = f"importacao_{timestamp}"
-        caminho_json = pasta_relatorios / f"{base_nome}.json"
+        caminho_xlsx = pasta_relatorios / f"{base_nome}_tickets_criados.xlsx"
         caminho_log = pasta_relatorios / f"{base_nome}.log.txt"
 
-        payload = {
-            "timestamp": timestamp,
-            "arquivo_origem": self.caminho_arquivo,
-            "resumo": resultado.get("resumo", ""),
-            "sucesso": resultado.get("sucesso", 0),
-            "erro_api": resultado.get("erro_api", 0),
-            "ignorados": resultado.get("ignorados", 0),
-            "detalhes": resultado.get("detalhes", []),
-        }
+        tickets_criados = []
+        for item in resultado.get("detalhes", []):
+            if item.get("status") == "criado" and item.get("ticket_id") is not None:
+                tickets_criados.append({"ticket_id": item.get("ticket_id")})
 
-        with caminho_json.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
+        pd.DataFrame(tickets_criados, columns=["ticket_id"]).to_excel(caminho_xlsx, index=False)
 
         with caminho_log.open("w", encoding="utf-8") as f:
             f.write(log_texto)
 
-        return str(caminho_json), str(caminho_log)
+        return str(caminho_xlsx), str(caminho_log)
