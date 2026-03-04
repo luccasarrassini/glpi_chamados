@@ -104,10 +104,11 @@ class ChamadosBackend:
         if self.df is None:
             return None
         preview_df = self.df.head(limite).copy()
-        if self.referencias_api["usuarios"]:
+        if self.referencias_api["usuarios"] and "tecnico_id" in preview_df.columns:
             preview_df["tecnico_nome"] = preview_df["tecnico_id"].apply(
                 lambda x: self._nome_por_id(x, self.referencias_api["usuarios"])
             )
+        if self.referencias_api["usuarios"] and "requerente_id" in preview_df.columns:
             preview_df["requerente_nome"] = preview_df["requerente_id"].apply(
                 lambda x: self._nome_por_id(x, self.referencias_api["usuarios"])
             )
@@ -128,8 +129,8 @@ class ChamadosBackend:
             "localizacoes": set(),
         }
         for _, row in self.df.iterrows():
-            tecnico_id = int_or_none(row["tecnico_id"])
-            requerente_id = int_or_none(row["requerente_id"])
+            tecnico_id = int_or_none(row.get("tecnico_id"))
+            requerente_id = int_or_none(row.get("requerente_id"))
             categoria_id = int_or_none(row["categoria_id"])
             localizacao_id = int_or_none(row["localizacao_id"])
             if tecnico_id is not None:
@@ -221,10 +222,10 @@ class ChamadosBackend:
 
                 categoria_id = int_or_none(row["categoria_id"])
                 localizacao_id = int_or_none(row["localizacao_id"])
-                tecnico_id = int_or_none(row["tecnico_id"])
-                requerente_id = int_or_none(row["requerente_id"])
+                tecnico_id = int_or_none(row.get("tecnico_id"))
+                requerente_id = int_or_none(row.get("requerente_id"))
 
-                if None in (categoria_id, localizacao_id, tecnico_id, requerente_id):
+                if None in (categoria_id, localizacao_id):
                     ignorados += 1
                     log_cb(f"[AVISO] Linha {linha_excel}: IDs invalidos. Ignorada.")
                     progresso_cb(index + 1, total)
@@ -232,9 +233,9 @@ class ChamadosBackend:
 
                 motivos_invalidos = []
                 if validar_api:
-                    if tecnico_id in self.referencias_invalidas["usuarios"]:
+                    if tecnico_id is not None and tecnico_id in self.referencias_invalidas["usuarios"]:
                         motivos_invalidos.append("tecnico_id")
-                    if requerente_id in self.referencias_invalidas["usuarios"]:
+                    if requerente_id is not None and requerente_id in self.referencias_invalidas["usuarios"]:
                         motivos_invalidos.append("requerente_id")
                     if categoria_id in self.referencias_invalidas["categorias"]:
                         motivos_invalidos.append("categoria_id")
@@ -249,18 +250,20 @@ class ChamadosBackend:
                     progresso_cb(index + 1, total)
                     continue
 
-                payload = {
-                    "input": {
-                        "name": str(titulo).strip(),
-                        "content": preparar_texto_glpi(descricao, usar_html=usar_html),
-                        "status": 1,
-                        "type": 1,
-                        "itilcategories_id": categoria_id,
-                        "locations_id": localizacao_id,
-                        "_users_id_assign": tecnico_id,
-                        "_users_id_requester": requerente_id,
-                    }
+                payload_input = {
+                    "name": str(titulo).strip(),
+                    "content": preparar_texto_glpi(descricao, usar_html=usar_html),
+                    "status": 1,
+                    "type": 1,
+                    "itilcategories_id": categoria_id,
+                    "locations_id": localizacao_id,
                 }
+                if tecnico_id is not None:
+                    payload_input["_users_id_assign"] = tecnico_id
+                if requerente_id is not None:
+                    payload_input["_users_id_requester"] = requerente_id
+
+                payload = {"input": payload_input}
 
                 try:
                     r = self.cliente.criar_chamado(headers, payload)

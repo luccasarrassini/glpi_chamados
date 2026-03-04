@@ -9,8 +9,6 @@ COLUNAS_OBRIGATORIAS = [
     "descricao",
     "categoria_id",
     "localizacao_id",
-    "tecnico_id",
-    "requerente_id",
 ]
 
 
@@ -91,21 +89,34 @@ def validar_dataframe(df):
             titulo = row["titulo"]
             categoria_id = row["categoria_id"]
             localizacao_id = row["localizacao_id"]
-            tecnico_id = row["tecnico_id"]
-            requerente_id = row["requerente_id"]
+            tecnico_id = row.get("tecnico_id")
+            requerente_id = row.get("requerente_id")
 
             if is_empty(titulo):
                 linhas_invalidas.append((linha_excel, "titulo vazio"))
                 continue
 
-            campos_numericos = {
+            campos_numericos_obrigatorios = {
                 "categoria_id": categoria_id,
                 "localizacao_id": localizacao_id,
+            }
+            campo_invalido = None
+            for nome, valor in campos_numericos_obrigatorios.items():
+                if int_or_none(valor) is None:
+                    campo_invalido = nome
+                    break
+
+            if campo_invalido:
+                linhas_invalidas.append((linha_excel, f"{campo_invalido} invalido"))
+                continue
+
+            campos_numericos_opcionais = {
                 "tecnico_id": tecnico_id,
                 "requerente_id": requerente_id,
             }
-            campo_invalido = None
-            for nome, valor in campos_numericos.items():
+            for nome, valor in campos_numericos_opcionais.items():
+                if is_empty(valor):
+                    continue
                 if int_or_none(valor) is None:
                     campo_invalido = nome
                     break
