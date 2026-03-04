@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -208,6 +209,7 @@ class ChamadosBackend:
             sucesso = 0
             erro_api = 0
             ignorados = 0
+            detalhes = []
 
             for index, row in self.df.iterrows():
                 linha_excel = index + 2
@@ -217,6 +219,13 @@ class ChamadosBackend:
                 if is_empty(titulo):
                     ignorados += 1
                     log_cb(f"[AVISO] Linha {linha_excel}: titulo vazio. Ignorada.")
+                    detalhes.append(
+                        {
+                            "linha_excel": linha_excel,
+                            "status": "ignorado",
+                            "motivo": "titulo vazio",
+                        }
+                    )
                     progresso_cb(index + 1, total)
                     continue
 
@@ -228,6 +237,13 @@ class ChamadosBackend:
                 if None in (categoria_id, localizacao_id):
                     ignorados += 1
                     log_cb(f"[AVISO] Linha {linha_excel}: IDs invalidos. Ignorada.")
+                    detalhes.append(
+                        {
+                            "linha_excel": linha_excel,
+                            "status": "ignorado",
+                            "motivo": "categoria_id/localizacao_id invalido",
+                        }
+                    )
                     progresso_cb(index + 1, total)
                     continue
 
@@ -246,6 +262,13 @@ class ChamadosBackend:
                     ignorados += 1
                     log_cb(
                         f"[AVISO] Linha {linha_excel}: {', '.join(motivos_invalidos)} nao encontrado(s) no GLPI. Ignorada."
+                    )
+                    detalhes.append(
+                        {
+                            "linha_excel": linha_excel,
+                            "status": "ignorado",
+                            "motivo": f"referencias invalidas: {', '.join(motivos_invalidos)}",
+                        }
                     )
                     progresso_cb(index + 1, total)
                     continue
@@ -269,12 +292,39 @@ class ChamadosBackend:
                     r = self.cliente.criar_chamado(headers, payload)
                     if r.status_code == 201:
                         sucesso += 1
+                        ticket_id = None
+                        try:
+                            ticket_id = r.json().get("id")
+                        except Exception:
+                            ticket_id = None
+                        detalhes.append(
+                            {
+                                "linha_excel": linha_excel,
+                                "status": "criado",
+                                "ticket_id": ticket_id,
+                            }
+                        )
                     else:
                         erro_api += 1
-                        log_cb(f"[ERRO] Linha {linha_excel}: status {r.status_code} - {r.text[:180]}")
+                        erro_msg = f"status {r.status_code} - {r.text[:180]}"
+                        log_cb(f"[ERRO] Linha {linha_excel}: {erro_msg}")
+                        detalhes.append(
+                            {
+                                "linha_excel": linha_excel,
+                                "status": "erro_api",
+                                "erro": erro_msg,
+                            }
+                        )
                 except Exception as e:
                     erro_api += 1
                     log_cb(f"[ERRO] Linha {linha_excel}: falha de requisicao - {e}")
+                    detalhes.append(
+                        {
+                            "linha_excel": linha_excel,
+                            "status": "erro_api",
+                            "erro": f"falha de requisicao - {e}",
+                        }
+                    )
 
                 progresso_cb(index + 1, total)
 
@@ -283,6 +333,7 @@ class ChamadosBackend:
                 "erro_api": erro_api,
                 "ignorados": ignorados,
                 "resumo": f"Finalizado: {sucesso} criados, {erro_api} erros de API, {ignorados} ignorados.",
+                "detalhes": detalhes,
             }
         finally:
             try:
@@ -418,3 +469,30 @@ class ChamadosBackend:
                 log_cb("[OK] Sessao GLPI finalizada.")
             except Exception as e:
                 log_cb(f"[AVISO] Nao foi possivel finalizar a sessao: {e}")
+
+    def salvar_relatorio_importacao(self, resultado, log_texto):
+        pasta_relatorios = self.config_path.parent / "relatorios"
+        pasta_relatorios.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_nome = f"importacao_{timestamp}"
+        caminho_json = pasta_relatorios / f"{base_nome}.json"
+        caminho_log = pasta_relatorios / f"{base_nome}.log.txt"
+
+        payload = {
+            "timestamp": timestamp,
+            "arquivo_origem": self.caminho_arquivo,
+            "resumo": resultado.get("resumo", ""),
+            "sucesso": resultado.get("sucesso", 0),
+            "erro_api": resultado.get("erro_api", 0),
+            "ignorados": resultado.get("ignorados", 0),
+            "detalhes": resultado.get("detalhes", []),
+        }
+
+        with caminho_json.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+        with caminho_log.open("w", encoding="utf-8") as f:
+            f.write(log_texto)
+
+        return str(caminho_json), str(caminho_log)

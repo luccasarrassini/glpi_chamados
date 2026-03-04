@@ -53,3 +53,11 @@ Principais libs de planilha usadas pelo app:
 - `openpyxl` (`.xlsx`, `.xlsm`)
 - `xlrd` (`.xls`)
 - `odfpy` (`.ods`)
+
+## Relatorios gerados
+Ao finalizar a importacao de chamados, o app salva automaticamente:
+- JSON com resumo + detalhes por linha (incluindo `ticket_id` quando criado).
+- Arquivo de log texto da execucao.
+
+Local padrao:
+- pasta `relatorios` no diretorio do projeto/app.
