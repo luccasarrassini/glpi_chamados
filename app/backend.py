@@ -504,12 +504,26 @@ class ChamadosBackend:
         caminho_xlsx = pasta_relatorios / f"{base_nome}_tickets_criados.xlsx"
         caminho_log = pasta_relatorios / f"{base_nome}.log.txt"
 
-        tickets_criados = []
+        ticket_por_linha = {}
         for item in resultado.get("detalhes", []):
-            if item.get("status") == "criado" and item.get("ticket_id") is not None:
-                tickets_criados.append({"ticket_id": item.get("ticket_id")})
+            linha_excel = item.get("linha_excel")
+            if linha_excel is None:
+                continue
+            ticket_por_linha[linha_excel] = item.get("ticket_id")
 
-        pd.DataFrame(tickets_criados, columns=["ticket_id"]).to_excel(caminho_xlsx, index=False)
+        if self.df is not None:
+            planilha_resultado = self.df.copy()
+            planilha_resultado["ticket_id"] = [
+                ticket_por_linha.get(indice + 2) for indice in planilha_resultado.index
+            ]
+        else:
+            tickets_criados = []
+            for item in resultado.get("detalhes", []):
+                if item.get("status") == "criado" and item.get("ticket_id") is not None:
+                    tickets_criados.append({"ticket_id": item.get("ticket_id")})
+            planilha_resultado = pd.DataFrame(tickets_criados, columns=["ticket_id"])
+
+        planilha_resultado.to_excel(caminho_xlsx, index=False)
 
         with caminho_log.open("w", encoding="utf-8") as f:
             f.write(log_texto)
